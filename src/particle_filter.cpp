@@ -20,6 +20,9 @@
 using namespace std;
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
+
+	cout << "\n*** INITIALIZE FILTER ***\n" << endl;
+
 	// Set the number of particles
 	num_particles = 100;
 
@@ -45,11 +48,22 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 		weights.push_back(1.0);
 	}
+
+	is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
+
+	cout << "\n*** PREDICT PARTICLE LOCATION ***\n" << endl;
+
 	// Add measurements to each particle and add random Gaussian noise.
 	for(int i = 0; i < num_particles; i++) {
+
+		cout << "Particle #" << particles[i].id << " ("
+				 << particles[i].x << ", "
+				 << particles[i].y << ", "
+				 << particles[i].theta
+				 << ")";
 
 		// Car's going on a straight line
 		if(yaw_rate == 0.0) {
@@ -73,6 +87,12 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		particles[i].x = dist_x(gen);
 		particles[i].y = dist_y(gen);
 		particles[i].theta = dist_theta(gen);
+
+		cout << " --> " << " ("
+				 << particles[i].x << ", "
+				 << particles[i].y << ", "
+				 << particles[i].theta
+				 << ")" << endl;
 	}
 }
 
@@ -81,21 +101,74 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	//   observed measurement to this particular landmark.
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to
 	//   implement this method and use it as a helper during the updateWeights phase.
-
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		const std::vector<LandmarkObs> &observations, const Map &map_landmarks) {
-	// TODO: Update the weights of each particle using a mult-variate Gaussian distribution. You can read
-	//   more about this distribution here: https://en.wikipedia.org/wiki/Multivariate_normal_distribution
-	// NOTE: The observations are given in the VEHICLE'S coordinate system. Your particles are located
-	//   according to the MAP'S coordinate system. You will need to transform between the two systems.
-	//   Keep in mind that this transformation requires both rotation AND translation (but no scaling).
-	//   The following is a good resource for the theory:
-	//   https://www.willamette.edu/~gorr/classes/GeneralGraphics/Transforms/transforms2d.htm
-	//   and the following is a good resource for the actual equation to implement (look at equation
-	//   3.33
-	//   http://planning.cs.uiuc.edu/node99.html
+
+	// Update each particle weight
+	for(int i = 0; i < num_particles; i++) {
+
+		double final_weight = 1.0;
+		std::vector<int> associations;
+		std::vector<double> sense_x;
+		std::vector<double> sense_y;
+
+		// 1. Find assocations between observations and landmarks for each particle
+		// 2. Compute weight
+		for(unsigned int i = 0; i < observations.size(); ++i) {
+
+			// 1...
+			//Map particle coordinates to map coordinates using homogenous Transformation
+			double x_map, y_map;
+			x_map = particles[i].x +
+				(cos(particles[i].theta) * observations[i].x) -
+				(sin(particles[i].theta) * observations[i].y);
+			y_map = particles[i].y +
+				(sin(particles[i].theta) * observations[i].x) +
+				(cos(particles[i].theta) * observations[i].y);
+
+			// Do measurement landmark associations
+			double min_dist = dist(
+				x_map,
+				y_map,
+				map_landmarks.landmark_list[0].x_f,
+				map_landmarks.landmark_list[0].y_f
+			);
+			int landmark_id = map_landmarks.landmark_list[0].id_i;
+
+			for(unsigned int i = 1; i < map_landmarks.landmark_list.size(); ++i) {
+				float x_landmark = map_landmarks.landmark_list[i].x_f;
+				float y_landmark = map_landmarks.landmark_list[i].y_f;
+
+				double tmp = dist(x_map, y_map, x_landmark, y_landmark);
+
+				if(tmp < min_dist) {
+					min_dist = tmp;
+					landmark_id = map_landmarks.landmark_list[i].id_i;
+				}
+			}
+
+			associations.push_back(landmark_id);
+			sense_x.push_back(x_map);
+			sense_y.push_back(y_map);
+
+			// 2...
+			// Calculate the particle's weight regarding the current observation
+			// using multivariate-Gaussian probability density
+			float mu_x = map_landmarks.landmark_list[landmark_id].x_f;
+			float mu_y = map_landmarks.landmark_list[landmark_id].y_f;
+			double x = sense_x[i];
+			double y = sense_y[i];
+
+			double gaussian_prob_density = pow((x - mu_x) / std_landmark[0], 2) + pow((y - mu_y) / std_landmark[1], 2);
+			gaussian_prob_density = exp(-0.5 * gaussian_prob_density);
+			gaussian_prob_density /= (2 * M_PI * std_landmark[0] * std_landmark[1]);
+
+			// Update the particle's final weight
+			final_weight *= gaussian_prob_density;
+		}
+	}
 }
 
 void ParticleFilter::resample() {
