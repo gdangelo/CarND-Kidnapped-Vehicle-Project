@@ -19,7 +19,7 @@
 
 using namespace std;
 
-double multivariate_gaussian_prob(double x, double y, float x_mu, float y_mu, double std_landmark[]) {
+double multivariateGaussianProb(double x, double y, float x_mu, float y_mu, double std_landmark[]) {
 	double prob;
 
 	double diff_x = x - x_mu;
@@ -61,6 +61,10 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 		particles.push_back(particle);
 
 		weights.push_back(1.0);
+
+		cout << "Particle ID#" << particle.id << " initialized: "
+				 << particle.x << ", " << particle.y << ", " << particle.theta
+				 << endl;
 	}
 
 	is_initialized = true;
@@ -73,11 +77,10 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	// Add measurements to each particle and add random Gaussian noise.
 	for(int i = 0; i < num_particles; i++) {
 
-		cout << "Particle #" << particles[i].id << " ("
+		cout << "Particle ID#" << particles[i].id << " "
 				 << particles[i].x << ", "
 				 << particles[i].y << ", "
-				 << particles[i].theta
-				 << ")";
+				 << particles[i].theta;
 
 		// Car's going on a straight line
 		if(yaw_rate == 0.0) {
@@ -102,11 +105,11 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		particles[i].y = dist_y(gen);
 		particles[i].theta = dist_theta(gen);
 
-		cout << " --> " << " ("
+		cout << " --> "
 				 << particles[i].x << ", "
 				 << particles[i].y << ", "
 				 << particles[i].theta
-				 << ")" << endl;
+				 << endl;
 	}
 }
 
@@ -125,9 +128,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	// Update each particle weight
 	for(int i = 0; i < num_particles; i++) {
 
-		cout << "Particle #" << particles[i].id << " ("
-				 << particles[i].weight
-				 << ")";
+		cout << "Particle ID#" << particles[i].id << endl;
 
 		double final_weight = 1.0;
 		std::vector<int> associations;
@@ -136,17 +137,16 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		// 1. Find assocations between observations and landmarks for each particle
 		// 2. Compute weight
-		for(unsigned int i = 0; i < observations.size(); ++i) {
+		for(unsigned int j = 0; j < observations.size(); ++j) {
 
 			// 1...
-			//Map particle coordinates to map coordinates using homogenous Transformation
-			double x_map, y_map;
-			x_map = particles[i].x +
-				(cos(particles[i].theta) * observations[i].x) -
-				(sin(particles[i].theta) * observations[i].y);
-			y_map = particles[i].y +
-				(sin(particles[i].theta) * observations[i].x) +
-				(cos(particles[i].theta) * observations[i].y);
+			// Map particle coordinates to map coordinates using homogenous Transformation
+			double x_map = particles[i].x +
+				(cos(particles[i].theta) * observations[j].x) -
+				(sin(particles[i].theta) * observations[j].y);
+			double y_map = particles[i].y +
+				(sin(particles[i].theta) * observations[j].x) +
+				(cos(particles[i].theta) * observations[j].y);
 
 			// Do measurement landmark associations
 			double min_dist = dist(
@@ -157,15 +157,15 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			);
 			int landmark_id = map_landmarks.landmark_list[0].id_i;
 
-			for(unsigned int i = 1; i < map_landmarks.landmark_list.size(); ++i) {
-				float x_landmark = map_landmarks.landmark_list[i].x_f;
-				float y_landmark = map_landmarks.landmark_list[i].y_f;
+			for(unsigned int k = 1; k < map_landmarks.landmark_list.size(); ++k) {
+				float x_landmark = map_landmarks.landmark_list[k].x_f;
+				float y_landmark = map_landmarks.landmark_list[k].y_f;
 
 				double tmp = dist(x_map, y_map, x_landmark, y_landmark);
 
 				if(tmp < min_dist) {
 					min_dist = tmp;
-					landmark_id = map_landmarks.landmark_list[i].id_i;
+					landmark_id = map_landmarks.landmark_list[k].id_i;
 				}
 			}
 
@@ -176,20 +176,25 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			// 2...
 			// Calculate the particle's weight regarding the current observation
 			// using multivariate-Gaussian probability density
-			float x_mu = map_landmarks.landmark_list[landmark_id-1].x_f;
-			float y_mu = map_landmarks.landmark_list[landmark_id-1].y_f;
-			double prob = multivariate_gaussian_prob(x_map, y_map, x_mu, y_mu, std_landmark);
+			double x_mu = map_landmarks.landmark_list[landmark_id-1].x_f;
+			double y_mu = map_landmarks.landmark_list[landmark_id-1].y_f;
+			double prob = multivariateGaussianProb(x_map, y_map, x_mu, y_mu, std_landmark);
 
 			// Update the particle's final weight
 			final_weight *= prob;
+
+			cout << "obsrv: " << observations[j].x << ", " << observations[j].y << "; "
+					 << "obsrv transf: " << x_map << ", " << y_map << "; "
+					 << "ass. lm: " << landmark_id << "; "
+					 << "lm coords: " << x_mu << ", " << y_mu << "; "
+					 << "obsrv weight: " << prob
+					 << endl;
 		}
 
 		particles[i].weight = final_weight;
 		weights[i] = final_weight;
 
-		cout << " --> " << particles[i].id << " ("
-				 << particles[i].weight
-				 << ")" << endl;
+		cout << "final particle weight: " << particles[i].weight << "\n" << endl;
 	}
 }
 
