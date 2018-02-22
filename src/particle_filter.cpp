@@ -19,6 +19,20 @@
 
 using namespace std;
 
+double multivariate_gaussian_prob(double x, double y, float x_mu, float y_mu, double std_landmark[]) {
+	double prob;
+
+	double diff_x = x - x_mu;
+	double diff_y = y - y_mu;
+
+	prob = (diff_x*diff_x) / (std_landmark[0]*std_landmark[0]);
+	prob += (diff_y*diff_y) / (std_landmark[1]*std_landmark[1]);
+	prob = exp(-0.5*prob);
+	prob /= (2 * M_PI * std_landmark[0] * std_landmark[1]);
+
+	return prob;
+}
+
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	cout << "\n*** INITIALIZE FILTER ***" << endl;
@@ -162,17 +176,12 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			// 2...
 			// Calculate the particle's weight regarding the current observation
 			// using multivariate-Gaussian probability density
-			float mu_x = map_landmarks.landmark_list[landmark_id].x_f;
-			float mu_y = map_landmarks.landmark_list[landmark_id].y_f;
-			double x = sense_x[i];
-			double y = sense_y[i];
-
-			double gaussian_prob_density = pow((x - mu_x) / std_landmark[0], 2) + pow((y - mu_y) / std_landmark[1], 2);
-			gaussian_prob_density = exp(-0.5 * gaussian_prob_density);
-			gaussian_prob_density /= (2 * M_PI * std_landmark[0] * std_landmark[1]);
+			float x_mu = map_landmarks.landmark_list[landmark_id-1].x_f;
+			float y_mu = map_landmarks.landmark_list[landmark_id-1].y_f;
+			double prob = multivariate_gaussian_prob(x_map, y_map, x_mu, y_mu, std_landmark);
 
 			// Update the particle's final weight
-			final_weight *= gaussian_prob_density;
+			final_weight *= prob;
 		}
 
 		particles[i].weight = final_weight;
