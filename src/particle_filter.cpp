@@ -21,7 +21,7 @@ using namespace std;
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
-	cout << "\n*** INITIALIZE FILTER ***\n" << endl;
+	cout << "\n*** INITIALIZE FILTER ***" << endl;
 
 	// Set the number of particles
 	num_particles = 100;
@@ -106,8 +106,14 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		const std::vector<LandmarkObs> &observations, const Map &map_landmarks) {
 
+	cout << "\n*** UPDATE WEIGHTS ***\n" << endl;
+
 	// Update each particle weight
 	for(int i = 0; i < num_particles; i++) {
+
+		cout << "Particle #" << particles[i].id << " ("
+				 << particles[i].weight
+				 << ")";
 
 		double final_weight = 1.0;
 		std::vector<int> associations;
@@ -171,14 +177,27 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		particles[i].weight = final_weight;
 		weights[i] = final_weight;
+
+		cout << " --> " << particles[i].id << " ("
+				 << particles[i].weight
+				 << ")" << endl;
 	}
 }
 
 void ParticleFilter::resample() {
-	// TODO: Resample particles with replacement with probability proportional to their weight.
-	// NOTE: You may find std::discrete_distribution helpful here.
-	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 
+	cout << "\n*** RESAMPLE PARTICLES ***\n" << endl;
+
+	// Resample particles with replacement with probability proportional to their weight
+	default_random_engine gen;
+	std::discrete_distribution<> d(weights.begin(), weights.end());
+	std::vector<Particle> new_particles;
+
+	for(int i = 0; i < num_particles; i++) {
+		new_particles.push_back(particles[d(gen)]);
+	}
+
+	particles = new_particles;
 }
 
 Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<int>& associations,
