@@ -168,6 +168,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			// Update the particle's final weight
 			final_weight *= gaussian_prob_density;
 		}
+
+		particles[i].weight = final_weight;
+		weights[i] = final_weight;
 	}
 }
 
