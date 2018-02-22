@@ -21,7 +21,7 @@ using namespace std;
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// Set the number of particles
-	num_particles = 1000;
+	num_particles = 100;
 
 	// Initialize all particles to first position (based on estimates of
 	// x, y, theta and their uncertainties from GPS) and all weights to 1
@@ -48,11 +48,32 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
-	// TODO: Add measurements to each particle and add random Gaussian noise.
-	// NOTE: When adding noise you may find std::normal_distribution and std::default_random_engine useful.
-	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
-	//  http://www.cplusplus.com/reference/random/default_random_engine/
+	// Add measurements to each particle and add random Gaussian noise.
+	for(int i = 0; i < num_particles; i++) {
 
+		// Car's going on a straight line
+		if(yaw_rate == 0.0) {
+			particles[i].x += cos(particles[i].theta) * velocity * delta_t;
+			particles[i].y += sin(particles[i].theta) * velocity * delta_t;
+		}
+		// Car's turning
+		else {
+			particles[i].x += (particles[i].theta / yaw_rate) * (sin(particles[i].theta + yaw_rate * delta_t) - sin(particles[i].theta));
+			particles[i].y += (particles[i].theta / yaw_rate) * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate * delta_t));
+			particles[i].theta += yaw_rate * delta_t;
+		}
+
+		// Create a normal (Gaussian) distribution for x, y, and theta
+		default_random_engine gen;
+		normal_distribution<double> dist_x(particles[i].x, std_pos[0]);
+		normal_distribution<double> dist_y(particles[i].y, std_pos[1]);
+		normal_distribution<double> dist_theta(particles[i].theta, std_pos[2]);
+
+		// Add noise
+		particles[i].x = dist_x(gen);
+		particles[i].y = dist_y(gen);
+		particles[i].theta = dist_theta(gen);
+	}
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
