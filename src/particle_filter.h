@@ -73,8 +73,9 @@ public:
 	 *   a nearest-neighbors data association).
 	 * @param predicted Vector of predicted landmark observations
 	 * @param observations Vector of landmark observations
+	 * @param particle Structure of the current particle
 	 */
-	void dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations);
+	void dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations, Particle &particle);
 
 	/**
 	 * transformObservations Transform each observations from vehicle coordinates

@@ -113,17 +113,22 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	}
 }
 
-void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
+void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations, Particle &particle) {
+	std::vector<int> associations;
+	std::vector<double> sense_x;
+	std::vector<double> sense_y;
+
 	// For each observation...
 	for(unsigned j = 0; j < observations.size(); ++j) {
-		int landmark_id;
+		int index, landmark_id;
 		double min_dist = 1.0e99;
 
 		// ...find the minimum distance between current observation and
 		// landmarks in sensor range only
+		double x1 = observations[j].x;
+		double y1 = observations[j].y;
+
 		for(unsigned k = 0; k < predicted.size(); ++k) {
-			double x1 = observations[j].x;
-			double y1 = observations[j].y;
 			double x2 = predicted[k].x;
 			double y2 = predicted[k].y;
 
@@ -131,13 +136,21 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 
 			if(current_dist < min_dist) {
 				min_dist = current_dist;
-				landmark_id = k;
+				index = k;
+				landmark_id = predicted[k].id;
 			}
 		}
 
 		// Assign the nearest landmark to current observation
-		observations[j].id = landmark_id;
+		observations[j].id = index;
+
+		associations.push_back(landmark_id);
+		sense_x.push_back(x1);
+		sense_y.push_back(y1);
 	}
+
+	// Set assocations for visualization purpose only
+	particle = SetAssociations(particle, associations, sense_x, sense_y);
 }
 
 void ParticleFilter::transformObservations(const std::vector<LandmarkObs> observations, std::vector<LandmarkObs> &map_observations, Particle particle) {
@@ -227,7 +240,10 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		selectLandmarksInSensorRange(sensor_range, map_landmarks, landmarks_in_range, particles[i]);
 
 		// STEP 3: Associate landmark id to each landmark observation
-		dataAssociation(landmarks_in_range, map_observations);
+		dataAssociation(landmarks_in_range, map_observations, particles[i]);
+		cout << "particles[i].associations.size() = " << particles[i].associations.size() << endl;
+		cout << "particles[i].sense_x.size() = " << particles[i].sense_x.size() << endl;
+		cout << "particles[i].sense_y.size() = " << particles[i].sense_y.size() << endl;
 
 		// STEP 4: Calculate the particle's final weight
 		computeWeight(map_observations, landmarks_in_range, particles[i], std_landmark);
@@ -257,8 +273,8 @@ void ParticleFilter::resample() {
 	particles = new_particles;
 }
 
-Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<int>& associations,
-                                     const std::vector<double>& sense_x, const std::vector<double>& sense_y)
+Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<int> &associations,
+                                     const std::vector<double> &sense_x, const std::vector<double> &sense_y)
 {
     //particle: the particle to assign each listed association, and association's (x,y) world coordinates mapping to
     // associations: The landmark id that goes along with each listed association
@@ -268,6 +284,8 @@ Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<i
     particle.associations = associations;
     particle.sense_x = sense_x;
     particle.sense_y = sense_y;
+
+		return particle;
 }
 
 string ParticleFilter::getAssociations(Particle best)
