@@ -114,10 +114,30 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
-	// TODO: Find the predicted measurement that is closest to each observed measurement and assign the
-	//   observed measurement to this particular landmark.
-	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to
-	//   implement this method and use it as a helper during the updateWeights phase.
+	// For each observation...
+	for(unsigned j = 0; j < observations.size(); ++j) {
+		int landmark_id;
+		double min_dist = 1.0e99;
+
+		// ...find the minimum distance between current observation and
+		// landmarks in sensor range only
+		for(unsigned k = 0; k < predicted.size(); ++k) {
+			double x1 = observations[j].x;
+			double y1 = observations[j].y;
+			double x2 = predicted[k].x;
+			double y2 = predicted[k].y;
+
+			double current_dist = dist(x1, y1, x2, y2);
+
+			if(current_dist < min_dist) {
+				min_dist = current_dist;
+				landmark_id = k;
+			}
+		}
+
+		// Assign the nearest landmark to current observation
+		observations[j].id = landmark_id;
+	}
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
@@ -178,29 +198,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		* Associate landmark id to each landmark observation
 		**************************************************************/
 
-		for(unsigned j = 0; j < map_observations.size(); ++j) {
-			int landmark_id;
-			double min_dist = 1.0e99;
-
-			// Find the minimum distance between current observation and
-			// landmarks in sensor range only
-			for(unsigned k = 0; k < landmarks_in_range.size(); ++k) {
-				double x1 = map_observations[j].x;
-				double y1 = map_observations[j].y;
-				double x2 = landmarks_in_range[k].x;
-				double y2 = landmarks_in_range[k].y;
-
-				double current_dist = dist(x1, y1, x2, y2);
-
-				if(current_dist < min_dist) {
-					min_dist = current_dist;
-					landmark_id = k;
-				}
-			}
-
-			// Assign the nearest landmark to current observation
-			map_observations[j].id = landmark_id;
-		}
+		dataAssociation(landmarks_in_range, map_observations);
 
 		/**************************************************************
 		* STEP 4:
