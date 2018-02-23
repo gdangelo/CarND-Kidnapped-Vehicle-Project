@@ -22,12 +22,10 @@ using namespace std;
 double multivariateGaussianProb(double x, double y, float x_mu, float y_mu, double std_landmark[]) {
 	double prob;
 
-	double diff_x = x - x_mu;
-	double diff_y = y - y_mu;
+	double x_part = ((x - x_mu)*(x - x_mu)) / (std_landmark[0]*std_landmark[0]);
+	double y_part = ((y - y_mu)*(y - y_mu)) / (std_landmark[1]*std_landmark[1]);
 
-	prob = (diff_x*diff_x) / (std_landmark[0]*std_landmark[0]);
-	prob += (diff_y*diff_y) / (std_landmark[1]*std_landmark[1]);
-	prob = exp(-0.5*prob);
+	prob = exp(-0.5 * (x_part + y_part));
 	prob /= (2 * M_PI * std_landmark[0] * std_landmark[1]);
 
 	return prob;
@@ -82,28 +80,30 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 				 << particles[i].y << ", "
 				 << particles[i].theta;
 
+		double theta = particles[i].theta;
+
 		// Car's going on a straight line
-		if(yaw_rate == 0.0) {
-			particles[i].x += cos(particles[i].theta) * velocity * delta_t;
-			particles[i].y += sin(particles[i].theta) * velocity * delta_t;
+		if(fabs(yaw_rate) < 0.00001) {
+			particles[i].x += cos(theta) * velocity * delta_t;
+			particles[i].y += sin(theta) * velocity * delta_t;
 		}
 		// Car's turning
 		else {
-			particles[i].x += (particles[i].theta / yaw_rate) * (sin(particles[i].theta + yaw_rate * delta_t) - sin(particles[i].theta));
-			particles[i].y += (particles[i].theta / yaw_rate) * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate * delta_t));
+			particles[i].x += velocity / yaw_rate * (sin(theta + yaw_rate * delta_t) - sin(theta));
+			particles[i].y += velocity / yaw_rate * (cos(theta) - cos(theta + yaw_rate * delta_t));
 			particles[i].theta += yaw_rate * delta_t;
 		}
 
 		// Create a normal (Gaussian) distribution for x, y, and theta
 		default_random_engine gen;
-		normal_distribution<double> dist_x(particles[i].x, std_pos[0]);
-		normal_distribution<double> dist_y(particles[i].y, std_pos[1]);
-		normal_distribution<double> dist_theta(particles[i].theta, std_pos[2]);
+		normal_distribution<double> dist_x(0.0, std_pos[0]);
+		normal_distribution<double> dist_y(0.0, std_pos[1]);
+		normal_distribution<double> dist_theta(0.0, std_pos[2]);
 
 		// Add noise
-		particles[i].x = dist_x(gen);
-		particles[i].y = dist_y(gen);
-		particles[i].theta = dist_theta(gen);
+		particles[i].x += dist_x(gen);
+		particles[i].y += dist_y(gen);
+		particles[i].theta += dist_theta(gen);
 
 		cout << " --> "
 				 << particles[i].x << ", "
@@ -149,15 +149,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 				(cos(particles[i].theta) * observations[j].y);
 
 			// Do measurement landmark associations
-			double min_dist = dist(
-				x_map,
-				y_map,
-				map_landmarks.landmark_list[0].x_f,
-				map_landmarks.landmark_list[0].y_f
-			);
-			int landmark_id = map_landmarks.landmark_list[0].id_i;
-
-			for(unsigned int k = 1; k < map_landmarks.landmark_list.size(); ++k) {
+			double min_dist = 1.0e99;
+			int landmark_id = -1;
+			for(unsigned int k = 0; k < map_landmarks.landmark_list.size(); ++k) {
 				float x_landmark = map_landmarks.landmark_list[k].x_f;
 				float y_landmark = map_landmarks.landmark_list[k].y_f;
 
