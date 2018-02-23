@@ -153,6 +153,28 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		/**************************************************************
 		* STEP 2:
+		* Find map landmarks within the sensor range
+		**************************************************************/
+
+		vector<LandmarkObs> landmarks_in_range;
+		for(unsigned j = 0; j < map_landmarks.landmark_list.size(); ++j) {
+			double x_ldm = map_landmarks.landmark_list[j].x_f;
+			double y_ldm = map_landmarks.landmark_list[j].y_f;
+
+			double dist_particle_landmark = dist(x_p, y_p, x_ldm, y_ldm);
+
+			if(dist_particle_landmark <= sensor_range) {
+				LandmarkObs landmark = {
+					map_landmarks.landmark_list[j].id_i,
+					map_landmarks.landmark_list[j].x_f,
+					map_landmarks.landmark_list[j].y_f
+				};
+				landmarks_in_range.push_back(landmark);
+			}
+		}
+
+		/**************************************************************
+		* STEP 3:
 		* Associate landmark id to each landmark observation
 		**************************************************************/
 
@@ -160,19 +182,19 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			int landmark_id;
 			double min_dist = 1.0e99;
 
-			// Find the minimum distance between current observation and landmarks
-			for(unsigned k = 0; k < map_landmarks.landmark_list.size(); ++k) {
+			// Find the minimum distance between current observation and
+			// landmarks in sensor range only
+			for(unsigned k = 0; k < landmarks_in_range.size(); ++k) {
 				double x1 = map_observations[j].x;
 				double y1 = map_observations[j].y;
-				double x2 = map_landmarks.landmark_list[k].x_f;
-				double y2 = map_landmarks.landmark_list[k].y_f;
+				double x2 = landmarks_in_range[k].x;
+				double y2 = landmarks_in_range[k].y;
 
-				int current_id = map_landmarks.landmark_list[k].id_i;
 				double current_dist = dist(x1, y1, x2, y2);
 
 				if(current_dist < min_dist) {
 					min_dist = current_dist;
-					landmark_id = current_id;
+					landmark_id = k;
 				}
 			}
 
@@ -181,7 +203,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		}
 
 		/**************************************************************
-		* STEP 3:
+		* STEP 4:
 		* Calculate the particle's final weight
 		**************************************************************/
 
@@ -193,18 +215,18 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			int ldm_id = map_observations[j].id;
 			double x_obs = map_observations[j].x;
 			double y_obs = map_observations[j].y;
-			double x_ldm = map_landmarks.landmark_list[ldm_id-1].x_f;
-			double y_ldm = map_landmarks.landmark_list[ldm_id-1].x_f;
+			double x_ldm = landmarks_in_range[ldm_id].x;
+			double y_ldm = landmarks_in_range[ldm_id].y;
 
 			double weight = multivariateGaussianProb(x_obs, y_obs, x_ldm, y_ldm, std_landmark);
 
-			/*cout << "x_obs = " << x_obs
+			cout << "x_obs = " << x_obs
 					 << ", y_obs = " << y_obs
 					 << ", x_ldm = " << x_ldm
 					 << ", y_ldm = " << y_ldm
 					 << ", ldm_id = " << ldm_id
 					 << ", weight = " << weight
-					 << endl;*/
+					 << endl;
 
 			if(weight > 0) {
 				particles[i].weight *= weight;
