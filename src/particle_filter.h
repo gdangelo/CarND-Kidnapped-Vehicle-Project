@@ -77,6 +77,32 @@ public:
 	void dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations);
 
 	/**
+	 * transformObservations Transform each observations from vehicle coordinates
+	 * to map coordinates
+	 * @param observations Vector of landmark observations in vehicle coordinates
+	 * @param map_observations Vector of landmark observations in map coordinates
+	 * @param particle Structure of the current particle
+	 */
+	void transformObservations(const std::vector<LandmarkObs> observations, std::vector<LandmarkObs> &map_observations, Particle particle);
+
+	/**
+	 * selectLandmarksInSensorRange Find map landmarks within the sensor range
+	 * @param sensor_range Sensor range in meters
+	 * @param map_landmarks All the landmarks in the map
+	 * @param landmarks_in_range Vector of landmark within sensor range
+	 * @param particle Structure of the current particle
+	 */
+	void selectLandmarksInSensorRange(double sensor_range, const Map &map_landmarks, std::vector<LandmarkObs> &landmarks_in_range, Particle particle);
+
+	/**
+	 * computeWeight Calculate the particle's final weight
+	 * @param map_observations Vector of landmark observations in map coordinates
+	 * @param landmarks_in_range Vector of landmark within sensor range
+	 * @param particle Structure of the current particle
+	 */
+	void computeWeight(std::vector<LandmarkObs> map_observations, std::vector<LandmarkObs> landmarks_in_range, Particle &particle, double std_landmark[]);
+
+	/**
 	 * updateWeights Updates the weights for each particle based on the likelihood of the
 	 *   observed measurements.
 	 * @param sensor_range Range [m] of sensor

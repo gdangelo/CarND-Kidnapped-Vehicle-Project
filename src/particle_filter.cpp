@@ -140,6 +140,76 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	}
 }
 
+void ParticleFilter::transformObservations(const std::vector<LandmarkObs> observations, std::vector<LandmarkObs> &map_observations, Particle particle) {
+	// For each observation...
+	for(unsigned j = 0; j < observations.size(); ++j) {
+		int id_obs = observations[j].id;
+		double x_obs = observations[j].x;
+		double y_obs = observations[j].y;
+		double x_p = particle.x;
+		double y_p = particle.y;
+		double theta_p = particle.theta;
+
+		// ...map vehicle coordinates to map coordinates
+		double x_map = x_p + cos(theta_p) * x_obs - sin(theta_p) * y_obs;
+		double y_map = y_p + sin(theta_p) * x_obs + cos(theta_p) * y_obs;
+
+		LandmarkObs current_map_observation = { id_obs, x_map, y_map };
+		map_observations.push_back(current_map_observation);
+	}
+}
+
+void ParticleFilter::selectLandmarksInSensorRange(double sensor_range, const Map &map_landmarks, std::vector<LandmarkObs> &landmarks_in_range, Particle particle) {
+	// For each landmark...
+	for(unsigned j = 0; j < map_landmarks.landmark_list.size(); ++j) {
+		double x_ldm = map_landmarks.landmark_list[j].x_f;
+		double y_ldm = map_landmarks.landmark_list[j].y_f;
+		double x_p = particle.x;
+		double y_p = particle.y;
+
+		// ...compute the distance between current particle and landmark
+		double dist_particle_landmark = dist(x_p, y_p, x_ldm, y_ldm);
+
+		// Select landmark only if it's within sensor range
+		if(dist_particle_landmark <= sensor_range) {
+			LandmarkObs landmark = {
+				map_landmarks.landmark_list[j].id_i,
+				map_landmarks.landmark_list[j].x_f,
+				map_landmarks.landmark_list[j].y_f
+			};
+			landmarks_in_range.push_back(landmark);
+		}
+	}
+}
+
+void ParticleFilter::computeWeight(std::vector<LandmarkObs> map_observations, std::vector<LandmarkObs> landmarks_in_range, Particle &particle, double std_landmark[]) {
+	// Reset particle's weight
+	particle.weight = 1.0;
+
+	// Add each observation-landmark association weight
+	for(unsigned int j = 0; j < map_observations.size(); ++j) {
+		int ldm_id = map_observations[j].id;
+		double x_obs = map_observations[j].x;
+		double y_obs = map_observations[j].y;
+		double x_ldm = landmarks_in_range[ldm_id].x;
+		double y_ldm = landmarks_in_range[ldm_id].y;
+
+		double weight = multivariateGaussianProb(x_obs, y_obs, x_ldm, y_ldm, std_landmark);
+
+		cout << "x_obs = " << x_obs
+				 << ", y_obs = " << y_obs
+				 << ", x_ldm = " << x_ldm
+				 << ", y_ldm = " << y_ldm
+				 << ", ldm_id = " << ldm_id
+				 << ", weight = " << weight
+				 << endl;
+
+		if(weight > 0) {
+			particle.weight *= weight;
+		}
+	}
+}
+
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		const std::vector<LandmarkObs> &observations, const Map &map_landmarks) {
 
@@ -148,88 +218,19 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	// Update each particle weight
 	for(int i = 0; i < num_particles; i++) {
 
-		double x_p = particles[i].x;
-		double y_p = particles[i].y;
-		double theta_p = particles[i].theta;
-
-		/**************************************************************
-		* STEP 1:
-		* Transform each observations from vehicle coordinates to
-		* map coordinates
-		**************************************************************/
-
+		// STEP 1: Map observations from vehicle coordinates to map coordinates
 		vector<LandmarkObs> map_observations;
-		for(unsigned j = 0; j < observations.size(); ++j) {
-			int id_obs = observations[j].id;
-			double x_obs = observations[j].x;
-			double y_obs = observations[j].y;
+		transformObservations(observations, map_observations, particles[i]);
 
-			double x_map = x_p + cos(theta_p) * x_obs - sin(theta_p) * y_obs;
-			double y_map = y_p + sin(theta_p) * x_obs + cos(theta_p) * y_obs;
-
-			LandmarkObs current_map_observation = { id_obs, x_map, y_map };
-			map_observations.push_back(current_map_observation);
-		}
-
-		/**************************************************************
-		* STEP 2:
-		* Find map landmarks within the sensor range
-		**************************************************************/
-
+		// STEP 2: Find map landmarks within the sensor range
 		vector<LandmarkObs> landmarks_in_range;
-		for(unsigned j = 0; j < map_landmarks.landmark_list.size(); ++j) {
-			double x_ldm = map_landmarks.landmark_list[j].x_f;
-			double y_ldm = map_landmarks.landmark_list[j].y_f;
+		selectLandmarksInSensorRange(sensor_range, map_landmarks, landmarks_in_range, particles[i]);
 
-			double dist_particle_landmark = dist(x_p, y_p, x_ldm, y_ldm);
-
-			if(dist_particle_landmark <= sensor_range) {
-				LandmarkObs landmark = {
-					map_landmarks.landmark_list[j].id_i,
-					map_landmarks.landmark_list[j].x_f,
-					map_landmarks.landmark_list[j].y_f
-				};
-				landmarks_in_range.push_back(landmark);
-			}
-		}
-
-		/**************************************************************
-		* STEP 3:
-		* Associate landmark id to each landmark observation
-		**************************************************************/
-
+		// STEP 3: Associate landmark id to each landmark observation
 		dataAssociation(landmarks_in_range, map_observations);
 
-		/**************************************************************
-		* STEP 4:
-		* Calculate the particle's final weight
-		**************************************************************/
-
-		// Reset particle's weight
-		particles[i].weight = 1.0;
-
-		// Add each observation-landmark association weight
-		for(unsigned int j = 0; j < map_observations.size(); ++j) {
-			int ldm_id = map_observations[j].id;
-			double x_obs = map_observations[j].x;
-			double y_obs = map_observations[j].y;
-			double x_ldm = landmarks_in_range[ldm_id].x;
-			double y_ldm = landmarks_in_range[ldm_id].y;
-
-			double weight = multivariateGaussianProb(x_obs, y_obs, x_ldm, y_ldm, std_landmark);
-
-			cout << "x_obs = " << x_obs
-					 << ", y_obs = " << y_obs
-					 << ", x_ldm = " << x_ldm
-					 << ", y_ldm = " << y_ldm
-					 << ", ldm_id = " << ldm_id
-					 << ", weight = " << weight
-					 << endl;
-
-			if(weight > 0) {
-				particles[i].weight *= weight;
-			}
-		}
+		// STEP 4: Calculate the particle's final weight
+		computeWeight(map_observations, landmarks_in_range, particles[i], std_landmark);
 
 		// Update global weights vector
 		weights[i] = particles[i].weight;
