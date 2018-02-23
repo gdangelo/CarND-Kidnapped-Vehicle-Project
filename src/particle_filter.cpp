@@ -72,6 +72,12 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 
 	cout << "\n*** PREDICT PARTICLE LOCATION ***\n" << endl;
 
+	// Create a normal (Gaussian) distribution for x, y, and theta
+	default_random_engine gen;
+	normal_distribution<double> dist_x(0.0, std_pos[0]);
+	normal_distribution<double> dist_y(0.0, std_pos[1]);
+	normal_distribution<double> dist_theta(0.0, std_pos[2]);
+
 	// Add measurements to each particle and add random Gaussian noise.
 	for(int i = 0; i < num_particles; i++) {
 
@@ -83,24 +89,18 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		double theta = particles[i].theta;
 
 		// Car's going on a straight line
-		if(fabs(yaw_rate) < 0.00001) {
+		if(fabs(yaw_rate) == 0) {
 			particles[i].x += cos(theta) * velocity * delta_t;
 			particles[i].y += sin(theta) * velocity * delta_t;
 		}
 		// Car's turning
 		else {
-			particles[i].x += velocity / yaw_rate * (sin(theta + yaw_rate * delta_t) - sin(theta));
-			particles[i].y += velocity / yaw_rate * (cos(theta) - cos(theta + yaw_rate * delta_t));
+			particles[i].x += (velocity / yaw_rate) * (sin(theta + (yaw_rate * delta_t)) - sin(theta));
+			particles[i].y += (velocity / yaw_rate) * (cos(theta) - cos(theta + (yaw_rate * delta_t)));
 			particles[i].theta += yaw_rate * delta_t;
 		}
 
-		// Create a normal (Gaussian) distribution for x, y, and theta
-		default_random_engine gen;
-		normal_distribution<double> dist_x(0.0, std_pos[0]);
-		normal_distribution<double> dist_y(0.0, std_pos[1]);
-		normal_distribution<double> dist_theta(0.0, std_pos[2]);
-
-		// Add noise
+		// Add noise to the particle
 		particles[i].x += dist_x(gen);
 		particles[i].y += dist_y(gen);
 		particles[i].theta += dist_theta(gen);
